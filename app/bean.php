@@ -61,7 +61,7 @@ return [
         'port'     => 6379,
         'database' => 0,
         'option'   => [
-            'prefix' => 'iagent:'
+            'prefix' => 'icollector:'
         ]
     ],
     'redis.pool' => [
@@ -75,7 +75,7 @@ return [
     ],
     'tcpServer'         => [
         // 'class' => TcpServer::class,
-        'port'  => env('TCP_PORT', 18309),
+        'port'  => env('TCP_PORT', 18310),
         'debug' => env('SWOFT_DEBUG', 0),
         'on' => [
             // SwooleEvent::TASK   => bean(TaskListener::class),  

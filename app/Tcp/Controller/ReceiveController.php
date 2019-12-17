@@ -28,9 +28,14 @@ use Swoft\Log\Helper\CLog;
 class ReceiveController
 {
     private static $queueName;
+    private static $kafkaAddr;
+    private static $kafkaTopic;
+
     public function __construct()
     {
-        self::$queueName = config('logjob.queue_name');
+        self::$queueName = config('error_collect.queue_name');
+        self::$kafkaAddr = config('kafka_config.kafka_addr');
+        self::$kafkaTopic = config('kafka_config.topic_name');
     }
     /**
      * @TcpMapping("receive", root=true)
@@ -44,8 +49,37 @@ class ReceiveController
         if (!$result['ret']) {
             \return_failed($response, '校验失败，非法数据');
         } else {
-            Redis::lPush(self::$queueName, json_encode($data)); 
+            $this->kafkaProducer(json_encode($data));
             \return_success($response);
         }
+    }
+
+    private function kafkaProducer(string $data): void
+    {
+        $conf = new \RdKafka\Conf();
+        $conf->set('metadata.broker.list', self::$kafkaAddr);
+        try {
+            $producer = new \RdKafka\Producer($conf);
+        
+            $topic = $producer->newTopic(self::$kafkaTopic);
+
+            $topic->produce(RD_KAFKA_PARTITION_UA, 0, $data);
+
+
+            for ($flushRetries = 0; $flushRetries < 10; $flushRetries++) {
+                $result = $producer->flush(100);
+                if (RD_KAFKA_RESP_ERR_NO_ERROR === $result) {
+                    break;
+                }
+            }
+
+            if (RD_KAFKA_RESP_ERR_NO_ERROR !== $result) {
+                Redis::lPush(self::$queueName, $data); 
+            }
+        }catch(\Exception $e) {
+            Log::error($e->getMessage());
+            Redis::lPush(self::$queueName, $data); 
+        }
+        
     }
 }
