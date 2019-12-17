@@ -26,4 +26,15 @@ class Application extends SwoftApplication
 
         date_default_timezone_set('Asia/Shanghai');
     }
+
+    public function getCLoggerConfig(): array
+    {
+        return [
+            'name'    => 'icollector',
+            'enable'  => true,
+            'output'  => true,
+            'levels'  => 'error',
+            'logFile' => ''
+        ];
+    }
 }

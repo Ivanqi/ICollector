@@ -29,12 +29,16 @@ class LogProcess implements ProcessInterface
     private static $queueName;
     private static $faileQueueName;
     private static $maxTimeout;
+    private static $kafkaAddr;
+    private static $kafkaTopic;
 
     public function __construct()
     {
-        self::$queueName = config('logjob.queue_name');
-        self::$faileQueueName = config('logjob.faile_queue_name');
-        self::$maxTimeout = config('logjob.queue_max_timeout');
+        self::$queueName = config('kafka_log.queue_name');
+        self::$faileQueueName = config('kafka_log.faile_queue_name');
+        self::$maxTimeout = config('kafka_log.queue_max_timeout');
+        self::$kafkaAddr = config('kafka_config.kafka_addr');
+        self::$kafkaTopic = config('kafka_config.topic_name');
     }
     /**
      * @param Pool $pool
@@ -55,8 +59,34 @@ class LogProcess implements ProcessInterface
         $logData = Redis::BRPOPLPUSH(self::$queueName, self::$faileQueueName, self::$maxTimeout);
         if ($logData) {
             CLog::info('logData- '. $logData);
-            // 接入LogSDK,把数据发往ICollector
-            Redis::lrem(self::$faileQueueName, $logData);
+            if ($this->kafkaProducer($logData)) {
+                Redis::lrem(self::$faileQueueName, $logData);
+            }
         }
+    }
+
+    private function kafkaProducer(string $data): bool
+    {
+        $conf = new \RdKafka\Conf();
+        $conf->set('metadata.broker.list', self::$kafkaAddr);
+        $producer = new \RdKafka\Producer($conf);
+    
+        $topic = $producer->newTopic(self::$kafkaTopic);
+
+        $topic->produce(RD_KAFKA_PARTITION_UA, 0, $data);
+
+
+        for ($flushRetries = 0; $flushRetries < 10; $flushRetries++) {
+            $result = $producer->flush(100);
+            if (RD_KAFKA_RESP_ERR_NO_ERROR === $result) {
+                break;
+            }
+        }
+
+        if (RD_KAFKA_RESP_ERR_NO_ERROR !== $result) {
+            return false;
+        }
+
+        return true; 
     }
 }
