@@ -22,7 +22,7 @@ use Swoft\Redis\Redis;
  *
  * @since 2.0
  *
- * @Process(workerId={0,1,2,3,4})
+ * @Process(workerId={0,1,2,3,4,5,6,7})
  */
 class LogProcess implements ProcessInterface
 {
@@ -77,7 +77,7 @@ class LogProcess implements ProcessInterface
 
 
         for ($flushRetries = 0; $flushRetries < 10; $flushRetries++) {
-            $result = $producer->flush(100);
+            $result = $producer->flush(10);
             if (RD_KAFKA_RESP_ERR_NO_ERROR === $result) {
                 break;
             }

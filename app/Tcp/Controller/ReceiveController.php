@@ -49,6 +49,4 @@ class ReceiveController
             \return_success($response);
         }
     }
-
-
 }
