@@ -16,7 +16,7 @@ use Swoft\Process\Contract\ProcessInterface;
 use Swoole\Coroutine;
 use Swoole\Process\Pool;
 use Swoft\Redis\Redis;
-
+use Swoft\Stdlib\Helper\ArrayHelper;
 /**
  * Class LogProcess
  *
@@ -61,7 +61,8 @@ class LogProcess implements ProcessInterface
     {
         $logData = Redis::BRPOPLPUSH(self::$queueName, self::$faileQueueName, self::$maxTimeout);
         if ($logData) {
-            $kafkaStatus = $this->kafkaProducer($logData);
+            $data = json_decode($logData, true);
+            $kafkaStatus = $this->kafkaProducer($logData, (int) ArrayHelper::getValue($data, 'project_id', 0));
             if ($kafkaStatus) {
                 Redis::lrem(self::$faileQueueName, $logData);
             } else {
@@ -70,13 +71,13 @@ class LogProcess implements ProcessInterface
         }
     }
 
-    private function kafkaProducer(string $data): bool
+    private function kafkaProducer(string $data, int $projectId): bool
     {
         if (self::$producer == NULL) {
             self::$producer = new \RdKafka\Producer(self::$conf);
         }
 
-        $topic = self::$producer->newTopic(self::$kafkaTopic);
+        $topic = self::$producer->newTopic(self::$kafkaTopic . '_' . $projectId);
         $topic->produce(RD_KAFKA_PARTITION_UA, 0, $data);
 
         for ($flushRetries = 0; $flushRetries < 10; $flushRetries++) {
@@ -85,7 +86,6 @@ class LogProcess implements ProcessInterface
                 break;
             }
         }
-
         if (RD_KAFKA_RESP_ERR_NO_ERROR !== $result) {
             return false;
         }
