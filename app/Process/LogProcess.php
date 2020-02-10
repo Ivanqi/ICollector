@@ -26,13 +26,16 @@ use Swoft\Stdlib\Helper\ArrayHelper;
  */
 class LogProcess implements ProcessInterface
 {
+    const LOSS_PROJECT  = 0;
     private static $queueName;
     private static $faileQueueName;
     private static $maxTimeout;
     private static $kafkaAddr;
     private static $kafkaTopic;
+    private static $topicRule;
     private static $producer;
     private static $conf;
+    private static $topics = [];
 
     public function __construct()
     {
@@ -41,9 +44,23 @@ class LogProcess implements ProcessInterface
         self::$maxTimeout = config('kafka_log.queue_max_timeout');
         self::$kafkaAddr = config('kafka_config.kafka_addr');
         self::$kafkaTopic = config('kafka_config.topic_name');
+        self::$topicRule = config('kafka_config.topic_rule');
 
         self::$conf = new \RdKafka\Conf();
         self::$conf->set('metadata.broker.list', self::$kafkaAddr);
+        self::$conf->set('socket.keepalive.enable', 'true');
+        self::$conf->set('log.connection.close', 'true');
+
+        /**
+         * 设置错误回调
+         */
+        self::$conf->setErrorCb(__CLASS__ . "::setErrorCb");
+
+        /**
+         * 设置投放回调
+         */
+        // self::$conf->setDrMsgCb(__CLASS__ . "::setDrMsgCb");
+
     }
     /**
      * @param Pool $pool
@@ -57,12 +74,24 @@ class LogProcess implements ProcessInterface
         }
     }
 
+    public static function setErrorCb($producer, $err, $reason)
+    {
+        CLog::error(rd_kafka_err2str($err) . ':' . $reason);
+    }
+
+    public static function setDrMsgCb($producer, $msg)
+    {
+        if ($msg->err) {
+            CLog::error("Message delivery failed: ". $msg->errstr());
+        }
+    }
+
     private function logHandle(): void
     {
         $logData = Redis::BRPOPLPUSH(self::$queueName, self::$faileQueueName, self::$maxTimeout);
         if ($logData) {
             $data = json_decode($logData, true);
-            $kafkaStatus = $this->kafkaProducer($logData, (int) ArrayHelper::getValue($data, 'project_id', 0));
+            $kafkaStatus = $this->kafkaProducer($data);
             if ($kafkaStatus) {
                 Redis::lrem(self::$faileQueueName, $logData);
             } else {
@@ -71,25 +100,35 @@ class LogProcess implements ProcessInterface
         }
     }
 
-    private function kafkaProducer(string $data, int $projectId): bool
+    private function kafkaProducer(array $data): bool
     {
         if (self::$producer == NULL) {
             self::$producer = new \RdKafka\Producer(self::$conf);
         }
 
-        $topic = self::$producer->newTopic(self::$kafkaTopic . '_' . $projectId);
-        $topic->produce(RD_KAFKA_PARTITION_UA, 0, $data);
-
-        for ($flushRetries = 0; $flushRetries < 10; $flushRetries++) {
-            $result = self::$producer->flush(10);
-            if (RD_KAFKA_RESP_ERR_NO_ERROR === $result) {
-                break;
+        foreach($data as $projectName => $records) {
+            if (!is_array($records)) continue;
+            foreach ($records as $recordsName => $recordsData) {
+                $topicName = sprintf(self::$topicRule, self::$kafkaTopic, $projectName, $recordsName);
+                if (!isset(self::$topics[$topicName])) {
+                    self::$topics[$topicName] = self::$producer->newTopic($topicName);
+                } else {
+                    if (self::$topics[$topicName] == NULL) {
+                        self::$topics[$topicName] = self::$producer->newTopic($topicName);
+                    }
+                }
+                if (!self::$producer->getMetadata(false, self::$topics[$topicName], 2 * 1000)) {
+                    CLog::error('Failed to get metadata, is broker down?');
+                }
+                self::$topics[$topicName]->produce(RD_KAFKA_PARTITION_UA, 0, json_encode($recordsData));
+                self::$producer->poll(0);
             }
         }
-        if (RD_KAFKA_RESP_ERR_NO_ERROR !== $result) {
-            return false;
+
+        while ((self::$producer->getOutQLen())) {
+            self::$producer->poll(20);
         }
 
-        return true; 
+       return self::$producer->getOutQLen() > 0 ? false : true;
     }
 }
