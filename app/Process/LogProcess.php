@@ -69,7 +69,9 @@ class LogProcess implements ProcessInterface
     public function run(Pool $pool, int $workerId): void
     { 
         while (true) {
-            $this->logHandle();
+            for ($i = 0; $i < 10; $i++) {
+                $this->logHandle();
+            }
             Coroutine::sleep(0.1);
         }
     }
