@@ -36,6 +36,7 @@ class LogProcess implements ProcessInterface
     private static $producer;
     private static $conf;
     private static $topics = [];
+    private static $multiMaxTimes = 1;
 
     public function __construct()
     {
@@ -45,6 +46,7 @@ class LogProcess implements ProcessInterface
         self::$kafkaAddr = config('kafka_config.kafka_addr');
         self::$kafkaTopic = config('kafka_config.topic_name');
         self::$topicRule = config('kafka_config.topic_rule');
+        self::$multiMaxTimes = config('kafka_log.multi_max_times');
 
         self::$conf = new \RdKafka\Conf();
         self::$conf->set('metadata.broker.list', self::$kafkaAddr);
@@ -69,7 +71,7 @@ class LogProcess implements ProcessInterface
     public function run(Pool $pool, int $workerId): void
     { 
         while (true) {
-            for ($i = 0; $i < 10; $i++) {
+            for ($i = 0; $i < self::$multiMaxTimes; $i++) {
                 $this->logHandle();
             }
             Coroutine::sleep(0.1);
@@ -92,7 +94,7 @@ class LogProcess implements ProcessInterface
     {
         $logData = Redis::BRPOPLPUSH(self::$queueName, self::$faileQueueName, self::$maxTimeout);
         if ($logData) {
-            $data = json_decode($logData, true);
+            $data = unserialize($logData);
             $kafkaStatus = $this->kafkaProducer($data);
             if ($kafkaStatus) {
                 Redis::lrem(self::$faileQueueName, $logData);
@@ -122,7 +124,7 @@ class LogProcess implements ProcessInterface
                 if (!self::$producer->getMetadata(false, self::$topics[$topicName], 2 * 1000)) {
                     CLog::error('Failed to get metadata, is broker down?');
                 }
-                self::$topics[$topicName]->produce(RD_KAFKA_PARTITION_UA, 0, json_encode($recordsData));
+                self::$topics[$topicName]->produce(RD_KAFKA_PARTITION_UA, 0, serialize($recordsData));
                 self::$producer->poll(0);
             }
         }
