@@ -51,7 +51,7 @@ class LogProcess implements ProcessInterface
         self::$conf = new \RdKafka\Conf();
         self::$conf->set('metadata.broker.list', self::$kafkaAddr);
         self::$conf->set('socket.keepalive.enable', 'true');
-        self::$conf->set('log.connection.close', 'true');
+        self::$conf->set('log.connection.close', 'false');
 
         /**
          * 设置错误回调
@@ -124,7 +124,7 @@ class LogProcess implements ProcessInterface
                 if (!self::$producer->getMetadata(false, self::$topics[$topicName], 2 * 1000)) {
                     CLog::error('Failed to get metadata, is broker down?');
                 }
-                self::$topics[$topicName]->produce(RD_KAFKA_PARTITION_UA, 0, serialize($recordsData));
+                self::$topics[$topicName]->produce(RD_KAFKA_PARTITION_UA, 0, json_encode($recordsData));
                 self::$producer->poll(0);
             }
         }
