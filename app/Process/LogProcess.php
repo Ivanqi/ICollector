@@ -124,7 +124,7 @@ class LogProcess implements ProcessInterface
                 if (!self::$producer->getMetadata(false, self::$topics[$topicName], 2 * 1000)) {
                     CLog::error('Failed to get metadata, is broker down?');
                 }
-                self::$topics[$topicName]->produce(RD_KAFKA_PARTITION_UA, 0, json_encode($recordsData));
+                self::$topics[$topicName]->produce(RD_KAFKA_PARTITION_UA, 0, serialize(gzcompress(serialize($recordsData))));
                 self::$producer->poll(0);
             }
         }

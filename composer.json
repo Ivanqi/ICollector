@@ -8,6 +8,12 @@
   ],
   "description": "Modern High performance AOP and Coroutine PHP Framework",
   "license": "Apache-2.0",
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/Ivanqi/KafkaScriptCommand.git"
+    }
+  ],
   "require": {
     "php": ">7.1",
     "ext-pdo": "*",
@@ -51,7 +57,8 @@
   },
   "require-dev": {
     "swoft/swoole-ide-helper": "dev-master",
-    "phpunit/phpunit": "^7.5"
+    "phpunit/phpunit": "^7.5",
+    "Ivanqi/KafkaScriptCommand": "dev-master"
   },
   "autoload": {
     "psr-4": {
