@@ -47,11 +47,17 @@ class LogProcess implements ProcessInterface
         self::$kafkaTopic = config('kafka_config.topic_name');
         self::$topicRule = config('kafka_config.topic_rule');
         self::$multiMaxTimes = config('kafka_log.multi_max_times');
+        $rdkafkaProducerConfig = config('kafka_config.rdkafka_producer_config');
 
         self::$conf = new \RdKafka\Conf();
-        self::$conf->set('metadata.broker.list', self::$kafkaAddr);
-        self::$conf->set('socket.keepalive.enable', 'true');
-        self::$conf->set('log.connection.close', 'false');
+        foreach($rdkafkaProducerConfig as $key => $data){
+            if (isset($data['func'])) {
+                $val = call_user_func([$this, $data['func']]);
+            } else {
+                $val = $data['val'];
+            }
+            self::$conf->set($key, $val);
+        }
 
         /**
          * 设置错误回调
@@ -63,6 +69,11 @@ class LogProcess implements ProcessInterface
          */
         // self::$conf->setDrMsgCb(__CLASS__ . "::setDrMsgCb");
 
+    }
+
+    public function getBrokerList()
+    {
+        return self::$kafkaAddr;
     }
     /**
      * @param Pool $pool
