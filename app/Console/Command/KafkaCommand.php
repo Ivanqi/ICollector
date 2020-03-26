@@ -16,7 +16,7 @@ use function output;
 use function sprintf;
 
 /**
- * Class KafkaCommand
+ * Kafka 脚本操作
  * @Command(name="kafka",coroutine=false)
  */
 class KafkaCommand 
