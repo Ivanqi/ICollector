@@ -4,8 +4,8 @@
 - 可拓展架构
   - ![可拓展架构](./docs/日志服务架构图_2.png)
 
-#### 服务代理(IAgent)
-![服务代理](./docs/ICollector_1.png)
+#### 服务收集(ICollector)
+![服务收集](./docs/ICollector_1.png)
 
 #### 依赖环境
 - PHP 7.x
