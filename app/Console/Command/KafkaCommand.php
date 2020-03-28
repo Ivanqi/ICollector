@@ -121,7 +121,7 @@ class KafkaCommand
     }
 
     /**
-     * @CommandMapping(name="show_consumeption", desc="查看消费组")
+     * @CommandMapping(name="show_consumeption", desc="查看组消费情况")
      */
     public function showConsumeption(Input $input, Output $output)
     {
